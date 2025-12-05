@@ -258,14 +258,24 @@ def nested_threshold_cv(X: pd.DataFrame, y: pd.Series,
                         precision_target: Optional[float] = None,
                         random_state: int = 42) -> Dict[str, float]:
     """
-    Para ajustar o threshold de decisão usando CV:
-    - Para cada fold: treina pipeline em train_fold, calcula probs em val_fold, encontra threshold ótimo (max F_beta ou threshold que atinge precision_target)
-    - Retorna média e std do thresholds, e thresholds por fold.
+    Ajusta o threshold de decisão usando validação cruzada.
+
+    Para cada fold:
+    - Treina o pipeline no fold de treino.
+    - Calcula probabilidades no fold de validação.
+    - Encontra o melhor threshold:
+        * Se precision_target for None: maximiza F_beta.
+        * Se precision_target for um valor (ex: 0.8): escolhe o menor threshold
+          que atinge pelo menos essa precision.
+    Retorna:
+    - thresholds por fold
+    - média e std dos thresholds
+    - métricas médias (precision, recall, f1, ap, roc_auc) e seus desvios.
     """
 
-    def f_beta(prec, rec, beta):
-        denom = (beta**2) * prec + rec
-        return (1 + beta**2) * (prec * rec) / denom if denom > 0 else 0.0
+    def f_beta(p: float, r: float, beta: float) -> float:
+        denom = (beta**2) * p + r
+        return (1 + beta**2) * (p * r) / denom if denom > 0 else 0.0
 
     skf = StratifiedKFold(n_splits=cv_splits, shuffle=True, random_state=random_state)
     thresholds = []
@@ -279,50 +289,58 @@ def nested_threshold_cv(X: pd.DataFrame, y: pd.Series,
 
         # clone seguro do pipeline
         pipe = clone(pipeline)
-        # treina no fold
+
+        # treinar no fold
         pipe.fit(X_tr, y_tr)
 
-        # predições do fold
+        # probabilidades no fold de validação
         probs = pipe.predict_proba(X_val)[:, 1]
-
+        prec, rec, th = precision_recall_curve(y_val, probs)
 
         if precision_target is not None:
-            # choose smallest threshold achieving target precision
+            # índices onde a precision >= alvo
             valid = np.where(prec >= precision_target)[0]
             if valid.size > 0:
-                chosen = th[valid.min()] if valid.min() < len(th) else th[-1]
+                idx = valid.min()
+                # th tem tamanho len(prec)-1
+                if idx < len(th):
+                    chosen = th[idx]
+                else:
+                    chosen = th[-1]
             else:
                 chosen = 0.5
         else:
-            # compute f_beta per threshold
+            # maximizar F_beta ao longo da curva
             fbs = np.array([f_beta(p, r, beta) for p, r in zip(prec[:-1], rec[:-1])])
-            if fbs.size == 0:
+            if fbs.size == 0 or np.all(np.isnan(fbs)):
                 chosen = 0.5
             else:
-                chosen = th[np.argmax(fbs)]
+                best_idx = int(np.nanargmax(fbs))
+                chosen = th[best_idx]
 
         thresholds.append(chosen)
 
-        # store fold metrics at chosen threshold
+        # métricas no fold com threshold escolhido
         y_pred = (probs >= chosen).astype(int)
         fold_metrics.append({
             "precision": precision_score(y_val, y_pred, zero_division=0),
-            "recall": recall_score(y_val, y_pred, zero_division=0),
-            "f1": f1_score(y_val, y_pred, zero_division=0),
-            "ap": average_precision_score(y_val, probs),
-            "roc_auc": roc_auc_score(y_val, probs)
+            "recall":    recall_score(y_val, y_pred, zero_division=0),
+            "f1":        f1_score(y_val, y_pred, zero_division=0),
+            "ap":        average_precision_score(y_val, probs),
+            "roc_auc":   roc_auc_score(y_val, probs),
         })
 
     thresholds = np.array(thresholds)
-    # aggregate metrics
     metrics_df = pd.DataFrame(fold_metrics)
+
     return {
         "thresholds_fold": thresholds.tolist(),
         "threshold_mean": float(thresholds.mean()),
         "threshold_std": float(thresholds.std()),
         "metrics_mean": metrics_df.mean().to_dict(),
-        "metrics_std": metrics_df.std().to_dict()
+        "metrics_std": metrics_df.std().to_dict(),
     }
+
 
 
 # -------------------------
