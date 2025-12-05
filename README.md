@@ -65,3 +65,120 @@ FraudSense/
 ````
 
 
+---
+
+# 🔬 Etapas do Projeto (CRISP-DM)
+
+## **1. Entendimento do Negócio**
+Fraudes representam perdas significativas para bancos e fintechs.  
+O foco do projeto é **detectar o máximo possível de fraudes**, sem aumentar falsos positivos e sem prejudicar a experiência do usuário.
+
+---
+
+## **2. Entendimento dos Dados**
+- 284.807 transações
+- Apenas **0,172% são fraude**
+- Variáveis V1–V28 já são PCA
+- Forte desbalanceamento → cuidado extremo com leakage
+
+---
+
+## **3. Preparação dos Dados**
+Criado pipeline com:
+
+- Imputação robusta (`median`)
+- Normalização `RobustScaler`
+- One-Hot Encoder para categorias futuras
+- SMOTE dentro do CV (via `imblearn`)
+- *ColumnTransformer* estruturado
+
+Pipeline salvo para reuso em produção.
+
+---
+
+## **4. Modelagem**
+Modelos treinados em validação cruzada estratificada:
+
+- Regressão Logística  
+- Random Forest  
+- XGBoost  
+- LightGBM  
+- CatBoost  
+
+Métrica principal: **Average Precision (AUC-PR)**  
+Justificativa → dataset extremamente desbalanceado.
+
+---
+
+## **5. Avaliação**
+Inclui:
+
+- Holdout final nunca visto  
+- Curva Precision-Recall  
+- Curva ROC  
+- Matriz de Confusão  
+- Threshold tuning via nested CV  
+- Explicabilidade com SHAP  
+- Permutation Importance  
+
+---
+
+## **6. Deploy Simulado**
+Função final:
+
+```python
+def predict_transactions(pipeline, df, threshold):
+    probs = pipeline.predict_proba(df)[:, 1]
+    preds = (probs >= threshold).astype(int)
+    return preds, probs
+
+### Como Reproduzir
+
+1. Instale dependências
+````
+pip install -r requirements.txt
+````
+
+### 2. Rode os notebooks na ordem:
+
+    01_eda_analysis.ipynb
+
+    02_preprocessing.ipynb
+
+    03_model_training.ipynb
+
+    04_evaluation_deployment.ipynb
+
+### 3. Execute pipeline_new.py para importar funções centrais.
+
+## Explicabilidade (SHAP)
+
+    Summary Plot global
+
+    Waterfall plot de uma transação fraudulenta
+
+    Permutation Importance
+
+    Análise de quais features puxam risco para cima ou para baixo
+
+Essencial para auditoria e uso em instituições financeiras.
+
+##  Próximos Passos
+
+    Implementar API REST (FastAPI)
+
+    Monitoramento de drift
+
+    Ajuste dinâmico de threshold
+
+    Integração com simulação de regra de negócio
+
+##  Autora
+
+Projeto desenvolvido por Debora Rebula como estudo avançado em ML para sistemas antifraude.
+
+## Licença
+
+    MIT — livre para uso e adaptação.
+
+
