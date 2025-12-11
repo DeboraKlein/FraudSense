@@ -13,172 +13,311 @@
 
 ---
 
-## Sobre o Projeto
 
-**FraudSense** é um pipeline completo de *Detecção de Fraude* desenvolvido com foco em **melhores práticas de Machine Learning aplicado ao sistema financeiro**.
 
-O objetivo é detectar transações fraudulentas no dataset altamente desbalanceado do Kaggle [_Credit Card Fraud Detection_], aplicando:
+### 1. Visão Geral
 
-- Pré-processamento profissional com `ColumnTransformer`  
-- Balanceamento *somente dentro do Cross-Validation* (evitando data leakage)  
-- Comparação justa entre modelos  
-- *Nested CV* para tuning de **threshold**  
-- Avaliação final em **holdout não visto**  
-- Explicabilidade com **SHAP** e **Permutation Importance**  
-- Função de **deploy** simulando produção  
+O FraudSense é um sistema completo de detecção de transações fraudulentas baseado em Machine Learning, construído com foco em:
 
-O projeto segue rigorosamente o CRISP-DM.
+   - Reprodutibilidade
 
----
+   - Robustez estatística
 
-# Principais Resultados
+   - Prevenção de leakage
 
-### Melhor modelo: **XGBoost**  
-- AP (AUC-PR CV): **0.857 ± 0.025**  
-- Precision após threshold: **0.95**  
-- Recall após threshold: **0.82**  
-- Threshold calibrado via nested CV: **~0.995**  
+   - Alta precisão operacional
 
-> **Isso reflete exatamente o que fintechs fazem**:  
-> Maximizar precisão, manter recall alto e reduzir falsos alertas.
+   - Explicabilidade (SHAP e Permutation Importance)
+
+Este projeto segue integralmente a metodologia CRISP-DM, abrangendo desde análise exploratória até avaliação final em holdout e criação de função de deploy.
+
+O objetivo é simular um pipeline real de risco e antifraude utilizado em bancos e fintechs, empregando práticas profissionais de modelagem supervisionada em cenários com alto desbalanceamento.
 
 ---
 
-# Arquitetura do Projeto
+### 2. Motivação
+
+Transações fraudulentas representam um risco financeiro e operacional significativo.
+No dataset utilizado (Kaggle – "Credit Card Fraud Detection"):
+
+   - Fraude ≈ 0,17% das transações
+
+   - Forte assimetria entre classes
+
+   - Variáveis anonimizadas via PCA
+
+   - Valores monetários altamente assimétricos
+
+Modelos tradicionais treinados sem cuidados tendem a prever sempre "não fraude" e obter acurácia artificialmente alta.
+Neste contexto, o FraudSense é construído para maximizar recall, precision e confiabilidade estatística.
+
+---
+
+### 3. Arquitetura do Projeto
+
+O projeto é estruturado em quatro notebooks, cada um representando uma fase clara do CRISP-DM:
+
+#### Notebook 1 — Análise Exploratória (EDA)
+
+   - Entendimento do desbalanceamento
+
+   - Distribuição de Amount, Time e PCA components
+
+   - Estatísticas descritivas e percentis
+
+   - Identificação de riscos de leakage
+
+   - Construção de narrativa analítica
+
+
+#### Notebook 2 — Pré-processamento
+
+   - Definição oficial de features
+
+   - Imputação (mediana)
+
+   - Escalonamento robusto (RobustScaler)
+
+   - Criação do preprocessor.joblib
+
+   - Salvamento de metadados (preprocessing_metadata.json)
+
+   - Base para modelagem e deploy
+
+#### Notebook 3 — Modelagem e Tuning
+
+   - Benchmark com 5 modelos (LR, RF, XGB, LGBM, CatBoost)
+
+   - Validação cruzada estratificada com SMOTE dentro dos folds
+
+   - Seleção baseada em Average Precision (AUC-PR)
+
+   - RandomizedSearchCV para hiperparâmetros
+
+   - Tuning de threshold via Nested CV
+
+   - Geração do pipeline final: best_pipeline.joblib
+
+   - Salvamento de threshold.json
+
+#### Notebook 4 — Avaliação Final, Explicabilidade e Deploy
+
+   - Avaliação em holdout (test split nunca visto)
+
+   - Métricas finais: precision, recall, F1, AUC-PR, ROC AUC
+
+   - Matriz de confusão
+
+   - Curvas ROC e PR
+
+   - Explicabilidade: SHAP (global e local) + Permutation Importance
+
+   - Função de deploy predict_transactions()
+
+---
+
+### 4. Técnicas Utilizadas
+##### Modelos
+
+   - Logistic Regression
+
+   - Random Forest
+
+   - XGBoost (modelo final)
+
+   - LightGBM
+
+   - CatBoost
+
+##### Métodos Chave
+
+   - SMOTE aplicado somente dentro da cross-validation
+
+   - Grid/Random Search estruturado via pipeline
+
+   - Nested CV para threshold tuning
+
+   - RobustScaler para variáveis financeiras
+
+   - SHAP para explicabilidade individual e global
+
+---
+
+### 5. Resultados Principais
+
+Após ajuste do threshold final (~0.995), o modelo atinge no holdout:
+
+   - Precision: ~0.95
+
+   - Recall: ~0.81
+
+   - F1: ~0.87
+
+   - AUC-PR: ~0.88
+
+   - ROC AUC: ~0.98
+
+Matriz de confusão (holdout):
+
+   - Falsos Positivos (FP): 4
+
+   - Falsos Negativos (FN): 19
+
+   - Fraudes detectadas: 79 de 98
+
+Esses resultados são realistas para um cenário de fraudes financeiras:
+
+   - Alta qualidade dos alertas (precision elevada)
+
+   - Cobertura significativa das fraudes (recall acima de 80%)
+
+   - Threshold conservador, alinhado a operações antifraude reais
+
+---
+
+### 6. Estrutura de Artefatos
 
 ````
-FraudSense/
-├── notebooks/
-│ ├── 01_eda_analysis.ipynb
-│ ├── 02_preprocessing.ipynb
-│ ├── 03_model_training.ipynb
-│ ├── 04_evaluation_deployment.ipynb
-│
-├── pipeline_new.py # Pipeline unificado do projeto
-├── artifacts/
-│ ├── preprocessor.joblib
-│ ├── best_pipeline.joblib
-│ ├── threshold.json
-│
-├── README.md
-└── Glossario.md
+artifacts/
+│── preprocessor.joblib
+│── best_pipeline.joblib
+│── threshold.json
 ````
 
+##### Esses arquivos possibilitam:
+
+   - Reproducibilidade total
+
+   - Carregamento direto em APIs ou sistemas de scoring
+
+   - Manutenção de consistência entre ambientes
 
 ---
 
-# 🔬 Etapas do Projeto (CRISP-DM)
+### 7. Função de Deploy
 
-## **1. Entendimento do Negócio**
-Fraudes representam perdas significativas para bancos e fintechs.  
-O foco do projeto é **detectar o máximo possível de fraudes**, sem aumentar falsos positivos e sem prejudicar a experiência do usuário.
-
----
-
-## **2. Entendimento dos Dados**
-- 284.807 transações
-- Apenas **0,172% são fraude**
-- Variáveis V1–V28 já são PCA
-- Forte desbalanceamento → cuidado extremo com leakage
-
----
-
-## **3. Preparação dos Dados**
-Criado pipeline com:
-
-- Imputação robusta (`median`)
-- Normalização `RobustScaler`
-- One-Hot Encoder para categorias futuras
-- SMOTE dentro do CV (via `imblearn`)
-- *ColumnTransformer* estruturado
-
-Pipeline salvo para reuso em produção.
-
----
-
-## **4. Modelagem**
-Modelos treinados em validação cruzada estratificada:
-
-- Regressão Logística  
-- Random Forest  
-- XGBoost  
-- LightGBM  
-- CatBoost  
-
-Métrica principal: **Average Precision (AUC-PR)**  
-Justificativa → dataset extremamente desbalanceado.
-
----
-
-## **5. Avaliação**
-Inclui:
-
-- Holdout final nunca visto  
-- Curva Precision-Recall  
-- Curva ROC  
-- Matriz de Confusão  
-- Threshold tuning via nested CV  
-- Explicabilidade com SHAP  
-- Permutation Importance  
-
----
-
-## **6. Deploy Simulado**
-Função final:
-
-```python
+A função abaixo simula o uso do modelo em produção:
+````
 def predict_transactions(pipeline, df, threshold):
     probs = pipeline.predict_proba(df)[:, 1]
     preds = (probs >= threshold).astype(int)
     return preds, probs
-
-### Como Reproduzir
-
-1. Instale dependências
-````
-pip install -r requirements.txt
 ````
 
-### 2. Rode os notebooks na ordem:
+##### Ela recebe transações brutas e retorna:
 
-    01_eda_analysis.ipynb
+   - Probabilidade de fraude
 
-    02_preprocessing.ipynb
+   - Classificação binária
 
-    03_model_training.ipynb
+   - Comportamento idêntico ao modelo lançado em produção
 
-    04_evaluation_deployment.ipynb
+---
 
-### 3. Execute pipeline_new.py para importar funções centrais.
+### 8. Explicabilidade
+#### SHAP
 
-## Explicabilidade (SHAP)
+   - Summary plot mostra variáveis que mais aumentam ou reduzem o risco.
 
-    Summary Plot global
+   - Waterfall plot explica decisões individuais.
 
-    Waterfall plot de uma transação fraudulenta
+#### Permutation Importance
 
-    Permutation Importance
+   - Mede a real importância das variáveis ao embaralhar seus valores.
 
-    Análise de quais features puxam risco para cima ou para baixo
+   - Ambos aumentam confiança no modelo para áreas como Risco, Compliance e Auditoria.
 
-Essencial para auditoria e uso em instituições financeiras.
+### 9. Requisitos
 
-##  Próximos Passos
+   - Python 3.9+
 
-    Implementar API REST (FastAPI)
+   - scikit-learn
 
-    Monitoramento de drift
+   - imbalanced-learn
 
-    Ajuste dinâmico de threshold
+   - XGBoost, LightGBM, CatBoost
 
-    Integração com simulação de regra de negócio
+   - SHAP
 
-##  Autora
+   - joblib
 
-Projeto desenvolvido por Debora Rebula como estudo avançado em ML para sistemas antifraude.
+   - seaborn, matplotlib
 
-## Licença
+   - kagglehub
 
-    MIT — livre para uso e adaptação.
+### 10. Estrutura do Repositório
 
+````
+FraudSense/
+│── notebooks/
+│   ├── 01_eda_analysis.ipynb
+│   ├── 02_preprocessing.ipynb
+│   ├── 03_model_training.ipynb
+│   ├── 04_evaluation_deployment.ipynb
+│
+│── pipeline_new.py
+│── Glossario.md
+│── README.md
+│── artifacts/
+````
 
+### Lições Aprendidas
+
+Reflexões profissionais e técnicas sobre o desenvolvimento do projeto
+
+---
+#### 1. A importância de evitar leakage
+
+Percebi que o maior risco em projetos reais de fraude não é escolher o melhor algoritmo, mas sim evitar vazamento de informação.
+Aprendi a:
+
+Colocar SMOTE dentro dos folds
+
+Embutir todo pré-processamento no pipeline
+
+Manter um holdout realmente isolado
+
+Essas práticas aumentam drasticamente a confiabilidade do modelo.
+
+---
+#### 2. AUC-ROC não é suficiente
+
+Entendi na prática que modelos com AUC-ROC alto podem ser inúteis em dados altamente desbalanceados.
+A métrica AUC-PR representa muito mais fielmente a capacidade do modelo.
+
+---
+#### 3. Threshold importa tanto quanto o modelo
+
+Percebi que 90% da performance operacional vem da escolha do threshold, não do algoritmo em si.
+Aprender a calibrar o threshold via nested CV foi um ponto-chave.
+
+---
+#### 4. Balanceamento deve ser feito com cuidado
+
+SMOTE aplicado fora da validação cruzada gera métricas irreais.
+Aprendi a aplicar balanceamento apenas no treinamento de cada fold, garantindo integridade estatística.
+
+---
+#### 5. Explicabilidade é indispensável
+
+Ao trabalhar com SHAP e permutation importance, entendi como justificar decisões do modelo para stakeholders de risco e compliance.
+Explicabilidade deixou de ser opcional e passou a ser parte fundamental do projeto.
+
+---
+#### 6. Modelos tree-based exigem tuning cuidadoso
+
+Percebi como hiperparâmetros influenciam modelos como XGBoost e LightGBM, especialmente em classes desbalanceadas.
+Aprendi a:
+
+Ajustar scale_pos_weight
+
+Controlar profundidade
+
+Balancear subsample e colsample
+
+---
+#### 7. ML real exige modularidade e artefatos
+
+Criar preprocessor.joblib, best_pipeline.joblib e threshold.json ensinou a pensar como MLOps, e não apenas como modelagem offline.
+
+---
